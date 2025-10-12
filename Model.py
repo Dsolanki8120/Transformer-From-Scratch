@@ -73,3 +73,92 @@ class FNN(nn.Module):
 
         
 
+# Multihead attention
+
+       # d_model: total embedding dimension (eg.512)
+       # h: number of attenttion heads (eg.8)
+       # dropout: droput rate for regularization
+
+
+class MultiheadAttention(nn.Module):
+
+    # input: (Batch,seq_len, d_model)
+    # output: (Batch,seq_len,d_model)
+    def __init__(self,d_model:int,h:int,dropout:float)-> None:
+        super().__init__()
+        self.d_model= d_model # dimension of the embedding vector
+        self.h= h # number of head
+        assert d_model%h==0," d_model is not divisible by h"
+        self.d_k= d_model //h # compute per head dimension , Each attention head will work on vector of size d_k
+        # Each head doesn't learn seprate matrices instead we project the input embedding into query , key,value spaces using fully connected layer
+        self.w_q= nn.Linear(d_model,d_model) #wq
+        self.w_k= nn.Linear(d_model,d_model) #wk
+        self.w_v= nn.Linear(d_model,d_model) #wv
+        self.w_o= nn.Linear(d_model,d_model) #W_o
+        self.dropout= nn.Dropout(dropout) # Used later on attention weight to prevent overfitting
+    
+    # This performs scaled-dot product Attention
+    def attention(query,key,value,mask,dropout:nn.Dropout):
+        # query: (batch,h,seq_len,d_k)
+        # key: (batch,h,seq_len,d_k)
+        # attention_scores= (batch,h,seq_len,seq_len)
+
+
+        d_k= query.shape[-1]
+        # query @ key.T computes pairwise similarity between tokens.
+        # Divide by √dₖ to normalize the magnitude,
+        # query: (batch,h,seq_len,d_k) @ key: (batch,h,d_k,seq_len) ( -2,-1 ).transpose we just swap last two dimension to do matrix multiplication
+        attention_score= (query @ key.transpose(-2,-1))/ math.sqrt(d_k)
+
+
+        if mask is not None:
+            attention_score.masked_fill(mask==0,-1e9)
+        
+        # apply softmax to get attention weight
+        # (Batch,h,seq_len,seq.len)
+        attention_score= attention_score.softmax(dim=-1)
+        if dropout is not None:
+            attention_score= dropout(attention_score)
+
+        return (attention_score @ value),attention_score
+    
+        
+    def forward(self,q,k,v,mask):
+
+        query= self.w_q(q) # (Batch,seq_len,d_model,seq,d_model)
+        key= self.w_k(k) # (Batch,seq_len,d_model,seq,d_model)
+        v= self.w_v(v) # (Batch,seq_len,d_model,seq,d_model)
+
+        # split query ,key ,value matrix
+
+        # (Batch,seq_len,d_model) ----> (Batch,seq_len,h,d_k)-------> (Batch,h,seq_len,d_k)
+
+        query = query.view(query.shape[0],query.shape[1],self.h,self.d_k).transpose(1,2)
+        key= key.view(key.shape[0],key.shape[1],self.h,self.d_k).transpose(1,2)
+        value= value.view(value.shape[0],value.shape[1],self.h,self.d_k).transpose(1,2)
+        x,self.attention_scores= MultiheadAttention.attention(query,key,value,mask,self.dropout)
+
+        #(Batch ,h,seq_len,d_k)----> ( Batch,seq_len,h,d_k)-------> (Batch,seq_len,d_model)
+
+        x= x.transpose(1,2).contigous().view(x.shape[0],-1, self.h*self.d_K)
+
+        # (Batch,seq_len,d_model)---> (Batch,seq_len,d_mdoel)
+
+        return self.w_o(x)
+
+class ResidualConnection(nn.Module):
+
+    def __init__(self,dropout:float)-> None:
+        super().__init__()
+        self.dropout = nn.Dropout(dropout) 
+        self.norm= LayerNormalization()
+
+    def forward(self,x,sublayer):
+        return x + self.dropout(sublayer(self.norm(x)))
+
+
+
+
+
+
+
