@@ -190,6 +190,70 @@ class Encoder(nn.Module):
 
 
 
+class DecoderBlock(nn.Module):
+
+    def __init__(self,self_attention_block:MultiheadAttention,cross_attention_block:MultiheadAttention,feed_forword_block:FNN,dropout:float)->None:
+
+        super().__init__()
+        self.self_attention_block= self_attention_block
+        self.cross_attention_block= cross_attention_block
+        self.feed_forward_block= FNN
+        self.residual_connection= nn.Module([ResidualConnection(dropout)for _ in range(3)])
+    
+    def forward(self,x,encoder_output,src_mask,target_mask):
+
+        x= self.residual_connection[0](x,lambda x: self.self_attention_block(x,x,x,target_mask))
+        x= self.residual_connection[1](x,lambda x: self.cross_attention_block(x,encoder_output,encoder_output,src_mask))
+        x= self.residual_connection[2](x,self.feed_forward_block)
+
+        return x
+
+
+
+class Decoder(nn.Module):
+
+    def __init__(self,layers:nn.ModuleList)-> None:
+
+        super().__init__()
+
+        self.layers= layers
+        self.norm= LayerNormalization()
+        
+    def forward(self,x,encoder_output,src_mask,target_mask):
+        for layer in self.layers:
+            x= layer(x,encoder_output,src_mask,target_mask)
+        return self.norm(x)
+        
+
+
+
+class projectionLayer(nn.Module):
+
+    def __init__(self,d_model:int, vocab_size:int)->None:
+        
+        super().__init__()
+        self.proj= nn.Linear(d_model,vocab_size)
+   
+    def forward(self,x):
+      
+        # (Batch,seq_len,d_model)---> (Batch,seq_len,vocab_size)
+        return torch.log_softmax(self.proj(x),dim= -1)
+
+
+class Transformer(nn.Module):
+
+
+    def __init__(self,encoder:Encoder,decoder:Decoder,src_embedding:Inputembedding,target_embedding:Inputembedding,src_pos:positionalEncoding,target_pos:positionalEncoding,projection_layer:projectionLayer)->None:
+
+        super().__init__()
+        self.encoder= encoder
+        self.decoder= decoder
+        self.src_embedding= src_embedding
+        self.target_embedding= target_embedding
+        self.src_pos= src_pos
+        self.target_pos= target_pos
+        self.projection_layer= projection_layer
+        
 
 
 
