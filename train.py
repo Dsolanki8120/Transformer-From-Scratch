@@ -72,18 +72,31 @@ def get_or_build_tokenizer(config, ds, lang):
     
     return tokenizer
 
+
 # ------------------------------------------------------------
 # Function 3: Load dataset and prepare both source + target tokenizers
 # ------------------------------------------------------------
 def get_ds(config):
+    """
+    Loads an English–Hindi dataset, builds or loads both tokenizers,
+    and splits the dataset into training and validation subsets.
+    """
+    #  1. Load parallel English–Hindi dataset from Hugging Face
+    # opus100 supports many language pairs including en-hi
+    ds_raw = load_dataset("opus100", f"{config['lang_src']}-{config['lang_tgt']}", split="train")
 
-    ds_raw= load_dataset('opus_books',f'{config["lang_src"]-{config["lang_tgt"]}}',split='train')
-    tokenizer_src=  get_or_build_tokenizer(config,ds_raw,config['lang_src'])
-    tokenizer_src= get_or_build_tokenizer(config,ds_raw,config['lang_tgt'])
+    #  2. Build or load the source (English) tokenizer
+    tokenizer_src = get_or_build_tokenizer(config, ds_raw, config["lang_src"])
 
-    # Keep 90% for training and 10% validation
+    #  3. Build or load the target (Hindi) tokenizer
+    tokenizer_tgt = get_or_build_tokenizer(config, ds_raw, config["lang_tgt"])
 
-    train_ds_size= int(0.9 * len(ds_raw))
-    val_ds_size= len(ds_raw)- train_ds_size
-    train_ds_raw,val_ds_raw = random_split(ds_raw,[train_ds_raw,val_ds_raw])
-  
+    #  4. Split dataset into 90% training, 10% validation
+    train_ds_size = int(0.9 * len(ds_raw))
+    val_ds_size = len(ds_raw) - train_ds_size
+
+    # random_split expects lengths, not variable names
+    train_ds_raw, val_ds_raw = random_split(ds_raw, [train_ds_size, val_ds_size])
+
+    #  5. Return everything needed for next steps
+    return train_ds_raw, val_ds_raw, tokenizer_src, tokenizer_tgt

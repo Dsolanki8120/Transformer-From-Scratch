@@ -16,7 +16,7 @@ class BilingualDataset(Dataset):
         # Language keys (for example, 'en', 'fr')
         self.src_lang = src_lang
         self.tgt_lang = tgt_lang
-        # ⚠️ Note: seq_len should also be stored (currently missing in your original code)
+        # Note: seq_len should also be stored (currently missing in your original code)
         # self.seq_len = seq_len
 
         # Convert special tokens into tensors of their respective token IDs
